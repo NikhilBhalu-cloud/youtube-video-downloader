@@ -1,24 +1,10 @@
 from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
-from pytube import YouTube
-from pytube.exceptions import (
-    VideoUnavailable, 
-    RegexMatchError, 
-    VideoPrivate, 
-    VideoRegionBlocked,
-    AgeRestrictedError,
-    LiveStreamError,
-    MembersOnly,
-    RecordingUnavailable,
-    PytubeError
-)
-from urllib.error import URLError, HTTPError
 import os
 import tempfile
 import re
-from pathlib import Path
-import socket
-import time
+import subprocess
+import json
 import shutil
 
 app = Flask(__name__, static_folder='static', template_folder='.')
@@ -40,43 +26,57 @@ def index():
     """Serve the main HTML page"""
     return render_template('index.html')
 
-def fetch_youtube_data_with_retry(url, max_retries=3, initial_delay=1):
+def get_video_info(url):
     """
-    Fetch YouTube data with retry logic for transient network errors
+    Extract video information using yt-dlp --dump-json
     
     Args:
         url: YouTube video URL
-        max_retries: Maximum number of retry attempts
-        initial_delay: Initial delay in seconds (doubles with each retry)
     
     Returns:
-        YouTube object
+        dict: Video information including title and formats
     
     Raises:
-        Various exceptions for different error scenarios
+        Exception: For various error scenarios
     """
-    last_exception = None
-    delay = initial_delay
-    
-    for attempt in range(max_retries):
-        try:
-            # Create YouTube object
-            yt = YouTube(url)
-            # Force fetch to validate the URL and check accessibility
-            _ = yt.title  # This triggers the actual request
-            return yt
-        except (URLError, ConnectionError, socket.error) as e:
-            last_exception = e
-            if attempt < max_retries - 1:
-                time.sleep(delay)
-                delay *= 2  # Exponential backoff
-            continue
-        except Exception as e:
-            # For non-network errors, don't retry
+    try:
+        # Run yt-dlp with --dump-json to get video information
+        result = subprocess.run(
+            ['yt-dlp', '--dump-json', '--no-playlist', url],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            error_msg = result.stderr.strip()
+            if 'Video unavailable' in error_msg:
+                raise Exception('Video is unavailable. It may have been removed or made private.')
+            elif 'Private video' in error_msg:
+                raise Exception('This video is private and cannot be downloaded.')
+            elif 'This video is not available' in error_msg:
+                raise Exception('This video is not available in your region.')
+            elif 'Sign in to confirm your age' in error_msg:
+                raise Exception('This video is age-restricted and cannot be downloaded.')
+            elif 'members-only' in error_msg:
+                raise Exception('This video is only available to channel members.')
+            else:
+                raise Exception(f'Failed to fetch video information: {error_msg}')
+        
+        # Parse JSON output
+        video_info = json.loads(result.stdout)
+        return video_info
+        
+    except subprocess.TimeoutExpired:
+        raise Exception('Request timed out. Please try again.')
+    except json.JSONDecodeError:
+        raise Exception('Failed to parse video information.')
+    except FileNotFoundError:
+        raise Exception('yt-dlp is not installed. Please install it first.')
+    except Exception as e:
+        if str(e).startswith('Video is') or str(e).startswith('This video') or str(e).startswith('Failed to'):
             raise
-    
-    # If all retries failed, raise the last exception
-    raise last_exception
+        raise Exception(f'An unexpected error occurred: {str(e)}')
 
 
 @app.route('/api/qualities', methods=['POST'])
@@ -93,81 +93,73 @@ def get_qualities():
         if not url.startswith(('http://', 'https://')):
             return jsonify({'error': 'Invalid URL format. URL must start with http:// or https://'}), 400
         
-        # Create YouTube object with retry logic
-        yt = fetch_youtube_data_with_retry(url)
+        # Get video information using yt-dlp
+        video_info = get_video_info(url)
         
-        # Get all available streams (progressive MP4 only for simplicity)
-        # Note: Progressive streams contain both audio and video in one file
-        # For higher quality, consider using adaptive streams (requires merging audio/video)
-        streams = yt.streams.filter(progressive=True, file_extension='mp4')
+        title = video_info.get('title', 'Unknown Title')
+        formats = video_info.get('formats', [])
         
-        # Format stream data
-        qualities = []
-        for stream in streams:
-            qualities.append({
-                'itag': stream.itag,
-                'resolution': stream.resolution,
-                'mime_type': stream.mime_type,
-                'filesize': stream.filesize,
-                # Safe division - handle both None and 0 cases
-                'filesize_mb': round(stream.filesize / (1024 * 1024), 2) if stream.filesize and stream.filesize > 0 else 0
+        # Filter and process formats
+        # We want formats with both video and audio (or progressive formats)
+        # Prefer formats with both vcodec and acodec
+        processed_formats = []
+        seen_formats = set()
+        
+        for fmt in formats:
+            format_id = fmt.get('format_id')
+            ext = fmt.get('ext')
+            vcodec = fmt.get('vcodec', 'none')
+            acodec = fmt.get('acodec', 'none')
+            
+            # Skip formats without video or audio codecs
+            if vcodec == 'none' or acodec == 'none':
+                continue
+            
+            # Skip if we've already seen this format
+            if format_id in seen_formats:
+                continue
+            
+            seen_formats.add(format_id)
+            
+            # Get resolution info
+            height = fmt.get('height')
+            resolution = f"{height}p" if height else "unknown"
+            
+            # Get filesize
+            filesize = fmt.get('filesize') or fmt.get('filesize_approx') or 0
+            filesize_mb = round(filesize / (1024 * 1024), 2) if filesize > 0 else 0
+            
+            processed_formats.append({
+                'format_id': format_id,
+                'resolution': resolution,
+                'ext': ext or 'mp4',
+                'filesize': filesize,
+                'filesize_mb': filesize_mb
             })
         
-        if not qualities:
-            return jsonify({'error': 'No downloadable video qualities found for this video'}), 422
+        # Sort by resolution (descending)
+        processed_formats.sort(key=lambda x: int(x['resolution'].replace('p', '')) if x['resolution'] != 'unknown' else 0, reverse=True)
+        
+        if not processed_formats:
+            return jsonify({'error': 'No downloadable video formats found for this video'}), 422
         
         return jsonify({
-            'title': yt.title,
-            'qualities': qualities
+            'title': title,
+            'formats': processed_formats
         })
     
-    except VideoUnavailable as e:
-        return jsonify({'error': 'Video is unavailable. It may have been removed or made private.'}), 404
-    
-    except VideoPrivate as e:
-        return jsonify({'error': 'This video is private and cannot be downloaded.'}), 403
-    
-    except VideoRegionBlocked as e:
-        return jsonify({'error': 'This video is not available in your region.'}), 403
-    
-    except AgeRestrictedError as e:
-        return jsonify({'error': 'This video is age-restricted and cannot be downloaded.'}), 403
-    
-    except LiveStreamError as e:
-        return jsonify({'error': 'Live streams cannot be downloaded. Please wait until the stream is finished.'}), 400
-    
-    except MembersOnly as e:
-        return jsonify({'error': 'This video is only available to channel members.'}), 403
-    
-    except RecordingUnavailable as e:
-        return jsonify({'error': 'This recording is unavailable.'}), 404
-    
-    except RegexMatchError as e:
-        return jsonify({'error': 'Invalid YouTube URL format. Please check the URL and try again.'}), 400
-    
-    except (socket.gaierror, socket.error) as e:
-        return jsonify({'error': 'Network timeout. Please check your internet connection and try again.'}), 503
-    
-    except URLError as e:
-        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
-        if 'Name or service not known' in error_msg or 'No address associated with hostname' in error_msg:
-            return jsonify({'error': 'Unable to reach YouTube servers. Please check your internet connection.'}), 503
-        return jsonify({'error': f'Network error: {error_msg}'}), 503
-    
-    except HTTPError as e:
-        status_code = e.code if 100 <= e.code < 600 else 500
-        return jsonify({'error': f'HTTP error {e.code}: {e.reason}'}), status_code
-    
-    except ConnectionError as e:
-        return jsonify({'error': 'Connection error. Please check your internet connection and try again.'}), 503
-    
-    except PytubeError as e:
-        return jsonify({'error': f'YouTube error: {str(e)}'}), 400
-    
     except Exception as e:
-        # Log the error for debugging (in production, use proper logging)
         error_message = str(e)
-        return jsonify({'error': f'An unexpected error occurred: {error_message}'}), 500
+        status_code = 400
+        
+        if 'unavailable' in error_message.lower() or 'removed' in error_message.lower():
+            status_code = 404
+        elif 'private' in error_message.lower() or 'region' in error_message.lower() or 'age-restricted' in error_message.lower() or 'members' in error_message.lower():
+            status_code = 403
+        elif 'timeout' in error_message.lower() or 'network' in error_message.lower():
+            status_code = 503
+        
+        return jsonify({'error': error_message}), status_code
 
 @app.route('/api/download', methods=['POST'])
 def download_video():
@@ -178,38 +170,54 @@ def download_video():
     try:
         data = request.get_json()
         url = data.get('url')
-        itag = data.get('itag')
+        format_id = data.get('format_id')
         
-        if not url or not itag:
-            return jsonify({'error': 'URL and itag are required'}), 400
+        if not url or not format_id:
+            return jsonify({'error': 'URL and format_id are required'}), 400
         
         # Validate URL format (basic check)
         if not url.startswith(('http://', 'https://')):
             return jsonify({'error': 'Invalid URL format. URL must start with http:// or https://'}), 400
         
-        # Create YouTube object with retry logic
-        yt = fetch_youtube_data_with_retry(url)
-        
-        # Get the selected stream
-        stream = yt.streams.get_by_itag(itag)
-        
-        if not stream:
-            return jsonify({'error': 'Invalid itag or stream not available'}), 400
-        
         # Create temporary directory for download
         temp_dir = tempfile.mkdtemp()
         
-        # Download the video
-        output_path = stream.download(output_path=temp_dir)
+        # Get video title first for filename
+        video_info = get_video_info(url)
+        title = video_info.get('title', 'video')
+        safe_title = sanitize_filename(title)
         
-        # Sanitize the video title for filename
-        safe_title = sanitize_filename(yt.title)
+        # Download using yt-dlp with specific format
+        output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
+        
+        result = subprocess.run(
+            ['yt-dlp', '-f', format_id, '-o', output_template, url],
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minutes timeout for download
+        )
+        
+        if result.returncode != 0:
+            error_msg = result.stderr.strip()
+            raise Exception(f'Download failed: {error_msg}')
+        
+        # Find the downloaded file
+        files = os.listdir(temp_dir)
+        if not files:
+            raise Exception('Download completed but file not found')
+        
+        output_path = os.path.join(temp_dir, files[0])
+        
+        # Get file extension
+        _, ext = os.path.splitext(output_path)
+        if not ext:
+            ext = '.mp4'
         
         # Send file to user
         response = send_file(
             output_path,
             as_attachment=True,
-            download_name=f"{safe_title}.mp4"
+            download_name=f"{safe_title}{ext}"
         )
         
         # Register cleanup callback to remove temp files after sending
@@ -219,72 +227,29 @@ def download_video():
                 if output_path and os.path.exists(output_path):
                     os.remove(output_path)
                 if temp_dir and os.path.exists(temp_dir):
-                    os.rmdir(temp_dir)
+                    shutil.rmtree(temp_dir)
             except Exception:
                 pass
         
         return response
     
-    except VideoUnavailable as e:
+    except subprocess.TimeoutExpired:
         cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'Video is unavailable. It may have been removed or made private.'}), 404
-    
-    except VideoPrivate as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'This video is private and cannot be downloaded.'}), 403
-    
-    except VideoRegionBlocked as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'This video is not available in your region.'}), 403
-    
-    except AgeRestrictedError as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'This video is age-restricted and cannot be downloaded.'}), 403
-    
-    except LiveStreamError as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'Live streams cannot be downloaded. Please wait until the stream is finished.'}), 400
-    
-    except MembersOnly as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'This video is only available to channel members.'}), 403
-    
-    except RecordingUnavailable as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'This recording is unavailable.'}), 404
-    
-    except RegexMatchError as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'Invalid YouTube URL format. Please check the URL and try again.'}), 400
-    
-    except (socket.gaierror, socket.error) as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'Network timeout. Please check your internet connection and try again.'}), 503
-    
-    except URLError as e:
-        cleanup_temp_files(output_path, temp_dir)
-        error_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
-        if 'Name or service not known' in error_msg or 'No address associated with hostname' in error_msg:
-            return jsonify({'error': 'Unable to reach YouTube servers. Please check your internet connection.'}), 503
-        return jsonify({'error': f'Network error: {error_msg}'}), 503
-    
-    except HTTPError as e:
-        cleanup_temp_files(output_path, temp_dir)
-        status_code = e.code if 100 <= e.code < 600 else 500
-        return jsonify({'error': f'HTTP error {e.code}: {e.reason}'}), status_code
-    
-    except ConnectionError as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': 'Connection error. Please check your internet connection and try again.'}), 503
-    
-    except PytubeError as e:
-        cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': f'YouTube error: {str(e)}'}), 400
+        return jsonify({'error': 'Download timed out. The video may be too large or your connection is slow.'}), 408
     
     except Exception as e:
         cleanup_temp_files(output_path, temp_dir)
         error_message = str(e)
-        return jsonify({'error': f'An unexpected error occurred: {error_message}'}), 500
+        status_code = 400
+        
+        if 'unavailable' in error_message.lower() or 'removed' in error_message.lower():
+            status_code = 404
+        elif 'private' in error_message.lower() or 'region' in error_message.lower() or 'age-restricted' in error_message.lower() or 'members' in error_message.lower():
+            status_code = 403
+        elif 'timeout' in error_message.lower() or 'network' in error_message.lower():
+            status_code = 503
+        
+        return jsonify({'error': error_message}), status_code
 
 
 def cleanup_temp_files(output_path, temp_dir):
