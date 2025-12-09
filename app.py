@@ -7,6 +7,21 @@ import subprocess
 import json
 import shutil
 
+# Simple cache for tool checks
+_tool_cache = {}
+
+
+def tool_exists(cmd):
+    """Return True if command exists on PATH (cached)."""
+    if cmd in _tool_cache:
+        return _tool_cache[cmd]
+    try:
+        subprocess.run([cmd, '--version'], capture_output=True, text=True, timeout=5)
+        _tool_cache[cmd] = True
+    except Exception:
+        _tool_cache[cmd] = False
+    return _tool_cache[cmd]
+
 app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
 
@@ -42,7 +57,7 @@ def get_video_info(url):
     try:
         # Run yt-dlp with --dump-json to get video information
         result = subprocess.run(
-            ['yt-dlp', '--dump-json', '--no-playlist', url],
+            ['python', '-m', 'yt_dlp', '--dump-json', '--no-playlist', url],
             capture_output=True,
             text=True,
             timeout=30
@@ -97,40 +112,83 @@ def get_qualities():
         video_info = get_video_info(url)
         
         title = video_info.get('title', 'Unknown Title')
+        thumbnail = video_info.get('thumbnail', '')
         formats = video_info.get('formats', [])
         
-        # Filter and process formats
-        # We want formats with both video and audio (or progressive formats)
-        # Prefer formats with both vcodec and acodec
+        # Filter and process formats - prefer formats with both video and audio combined
         processed_formats = []
-        seen_formats = set()
-        
+        seen_resolutions = {}
+
+        # Collect audio-only formats and best audio per container
+        audio_formats = []
+        best_audio_by_ext = {}
+        best_audio_overall = None
+        video_formats = []
+
         for fmt in formats:
-            format_id = fmt.get('format_id')
-            ext = fmt.get('ext')
             vcodec = fmt.get('vcodec', 'none')
             acodec = fmt.get('acodec', 'none')
-            
-            # Skip formats without video or audio codecs
-            if not vcodec or vcodec == 'none' or not acodec or acodec == 'none':
-                continue
-            
-            # Skip if we've already seen this format
-            if format_id in seen_formats:
-                continue
-            
-            seen_formats.add(format_id)
-            
-            # Get resolution info
+            ext = fmt.get('ext')
             height = fmt.get('height')
-            resolution = f"{height}p" if height else "unknown"
-            
-            # Get filesize
+
+            # Collect audio-only formats
+            if acodec and acodec != 'none' and (not vcodec or vcodec == 'none'):
+                audio_formats.append(fmt)
+                key = ext or 'default'
+                current = best_audio_by_ext.get(key)
+                abr = fmt.get('abr') or 0
+                if not current or abr > (current.get('abr') or 0):
+                    best_audio_by_ext[key] = fmt
+                if not best_audio_overall or abr > (best_audio_overall.get('abr') or 0):
+                    best_audio_overall = fmt
+
+            # Collect video formats (with video codec)
+            if vcodec and vcodec != 'none':
+                video_formats.append(fmt)
+
+        # Process video formats and combine with the best matching audio
+        for fmt in video_formats:
+            format_id = fmt.get('format_id')
+            ext = fmt.get('ext')
+            acodec = fmt.get('acodec', 'none')
+            height = fmt.get('height', 0)
+
+            # Skip if no height info
+            if not height or height == 0:
+                continue
+
+            resolution = f"{height}p"
+
+            # Calculate total filesize
             filesize = fmt.get('filesize') or fmt.get('filesize_approx') or 0
+
+            # Prefer audio that matches the container (webm/mp4), fallback to best overall
+            audio_match = best_audio_by_ext.get(ext) or best_audio_overall
+
+            # If format doesn't have audio, add matched audio
+            if not acodec or acodec == 'none':
+                if audio_match:
+                    audio_filesize = audio_match.get('filesize') or audio_match.get('filesize_approx') or 0
+                    filesize = filesize + audio_filesize
+                    combined_id = f"{format_id}+{audio_match.get('format_id')}"
+                else:
+                    continue
+            else:
+                combined_id = format_id
+
+            # Skip duplicate resolutions (keep the best quality for each resolution)
+            if resolution in seen_resolutions:
+                prev_filesize = seen_resolutions[resolution]['filesize']
+                if filesize <= prev_filesize:
+                    continue
+                # Remove previous entry for this resolution
+                processed_formats = [f for f in processed_formats if f['resolution'] != resolution]
+
+            seen_resolutions[resolution] = {'filesize': filesize}
             filesize_mb = round(filesize / (1024 * 1024), 2) if filesize > 0 else 0
-            
+
             processed_formats.append({
-                'format_id': format_id,
+                'format_id': combined_id,
                 'resolution': resolution,
                 'ext': ext or 'mp4',
                 'filesize': filesize,
@@ -144,7 +202,6 @@ def get_qualities():
                 res = fmt['resolution']
                 if res == 'unknown':
                     return 0
-                # Extract only digits from resolution string (e.g., '720p60' -> 720)
                 match = re.search(r'(\d+)', res)
                 return int(match.group(1)) if match else 0
             except (ValueError, KeyError, AttributeError):
@@ -157,6 +214,7 @@ def get_qualities():
         
         return jsonify({
             'title': title,
+            'thumbnail': thumbnail,
             'formats': processed_formats
         })
     
@@ -201,9 +259,17 @@ def download_video():
         
         # Download using yt-dlp with specific format
         output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
+
+        requires_merge = '+' in format_id
+        if requires_merge and not tool_exists('ffmpeg'):
+            raise Exception('High-quality formats need ffmpeg to merge audio and video. Install ffmpeg and try again, or choose a lower resolution (e.g., 360p).')
+
+        yt_cmd = ['python', '-m', 'yt_dlp', '-f', format_id, '-o', output_template, url]
+        if requires_merge:
+            yt_cmd.extend(['--merge-output-format', 'mp4'])
         
         result = subprocess.run(
-            ['yt-dlp', '-f', format_id, '-o', output_template, url],
+            yt_cmd,
             capture_output=True,
             text=True,
             timeout=300  # 5 minutes timeout for download
