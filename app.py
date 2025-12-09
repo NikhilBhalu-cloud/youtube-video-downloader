@@ -65,7 +65,7 @@ def fetch_youtube_data_with_retry(url, max_retries=3, initial_delay=1):
             # Force fetch to validate the URL and check accessibility
             _ = yt.title  # This triggers the actual request
             return yt
-        except (URLError, ConnectionError, OSError) as e:
+        except (URLError, ConnectionError, socket.error) as e:
             last_exception = e
             if attempt < max_retries - 1:
                 time.sleep(delay)
@@ -145,7 +145,7 @@ def get_qualities():
     except RegexMatchError as e:
         return jsonify({'error': 'Invalid YouTube URL format. Please check the URL and try again.'}), 400
     
-    except (socket.gaierror, OSError) as e:
+    except (socket.gaierror, socket.error) as e:
         return jsonify({'error': 'Network timeout. Please check your internet connection and try again.'}), 503
     
     except URLError as e:
@@ -257,7 +257,7 @@ def download_video():
         cleanup_temp_files(output_path, temp_dir)
         return jsonify({'error': 'Invalid YouTube URL format. Please check the URL and try again.'}), 400
     
-    except (socket.gaierror, OSError) as e:
+    except (socket.gaierror, socket.error) as e:
         cleanup_temp_files(output_path, temp_dir)
         return jsonify({'error': 'Network timeout. Please check your internet connection and try again.'}), 503
     
@@ -292,9 +292,15 @@ def cleanup_temp_files(output_path, temp_dir):
     try:
         if output_path and os.path.exists(output_path):
             os.remove(output_path)
+    except (OSError, IOError):
+        # Ignore file removal errors during cleanup
+        pass
+    
+    try:
         if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
-    except Exception:
+    except (OSError, IOError):
+        # Ignore directory removal errors during cleanup
         pass
 
 if __name__ == '__main__':
