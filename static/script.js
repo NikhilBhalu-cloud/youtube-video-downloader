@@ -11,7 +11,7 @@ const successDiv = document.getElementById('success');
 
 // Store current video data
 let currentVideoUrl = '';
-let currentQualities = [];
+let currentFormats = [];
 
 // API base URL - will work for both local and production
 const API_BASE = window.location.origin;
@@ -103,24 +103,24 @@ async function getVideoQualities() {
         
         // Store data
         currentVideoUrl = url;
-        currentQualities = data.qualities;
+        currentFormats = data.formats;
         
         // Display video title
         videoTitleEl.textContent = data.title;
         
         // Populate quality dropdown
-        if (data.qualities && data.qualities.length > 0) {
-            data.qualities.forEach(quality => {
+        if (data.formats && data.formats.length > 0) {
+            data.formats.forEach(format => {
                 const option = document.createElement('option');
-                option.value = quality.itag;
-                option.textContent = `${quality.resolution} - ${quality.mime_type} (${quality.filesize_mb} MB)`;
+                option.value = format.format_id;
+                option.textContent = `${format.resolution} - ${format.ext} (${format.filesize_mb} MB)`;
                 qualitySelect.appendChild(option);
             });
             
             showElement(videoInfoDiv);
-            showSuccess('Video qualities loaded successfully!');
+            showSuccess('Video formats loaded successfully!');
         } else {
-            showError('No downloadable qualities found for this video');
+            showError('No downloadable formats found for this video');
         }
         
     } catch (error) {
@@ -133,9 +133,9 @@ async function getVideoQualities() {
 
 // Download video
 async function downloadVideo() {
-    const selectedItag = qualitySelect.value;
+    const selectedFormatId = qualitySelect.value;
     
-    if (!selectedItag) {
+    if (!selectedFormatId) {
         showError('Please select a quality');
         return;
     }
@@ -152,7 +152,7 @@ async function downloadVideo() {
             },
             body: JSON.stringify({ 
                 url: currentVideoUrl,
-                itag: parseInt(selectedItag)
+                format_id: selectedFormatId
             })
         });
         

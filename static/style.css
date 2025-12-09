@@ -6,7 +6,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: white;
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -21,27 +21,25 @@ body {
 
 .card {
     background: white;
-    border-radius: 16px;
+    border: 2px solid black;
     padding: 40px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 h1 {
-    color: #333;
+    color: black;
     font-size: 28px;
     margin-bottom: 10px;
     text-align: center;
 }
 
 .warning {
-    background: #fff3cd;
-    color: #856404;
+    background: white;
+    color: black;
     padding: 12px;
-    border-radius: 8px;
+    border: 1px solid black;
     margin-bottom: 24px;
     text-align: center;
     font-size: 14px;
-    border: 1px solid #ffc107;
 }
 
 .input-group {
@@ -51,68 +49,61 @@ h1 {
 input[type="text"] {
     width: 100%;
     padding: 14px 16px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    border: 2px solid black;
     font-size: 16px;
-    transition: all 0.3s ease;
+    background: white;
+    color: black;
 }
 
 input[type="text"]:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border: 2px solid black;
 }
 
 .btn {
     width: 100%;
     padding: 14px 24px;
-    border: none;
-    border-radius: 8px;
+    border: 2px solid black;
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    background: white;
+    color: black;
+}
+
+.btn:hover {
+    background: black;
+    color: white;
 }
 
 .btn-primary {
-    background: #667eea;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #5568d3;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    background: white;
+    color: black;
 }
 
 .btn-success {
-    background: #28a745;
-    color: white;
+    background: white;
+    color: black;
     margin-top: 16px;
 }
 
-.btn-success:hover {
-    background: #218838;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
-}
-
 .btn:disabled {
-    background: #ccc;
+    background: white;
+    color: #999;
+    border-color: #999;
     cursor: not-allowed;
-    transform: none;
 }
 
 .video-info {
     margin-top: 24px;
     padding-top: 24px;
-    border-top: 2px solid #f0f0f0;
+    border-top: 2px solid black;
 }
 
 .video-info h3 {
-    color: #333;
+    color: black;
     font-size: 18px;
     margin-bottom: 16px;
 }
@@ -124,25 +115,23 @@ input[type="text"]:focus {
 .select-group label {
     display: block;
     margin-bottom: 8px;
-    color: #555;
+    color: black;
     font-weight: 500;
 }
 
 .quality-select {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    border: 2px solid black;
     font-size: 16px;
     background: white;
+    color: black;
     cursor: pointer;
-    transition: all 0.3s ease;
 }
 
 .quality-select:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border: 2px solid black;
 }
 
 .loading {
@@ -154,8 +143,8 @@ input[type="text"]:focus {
     width: 50px;
     height: 50px;
     margin: 0 auto 16px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #667eea;
+    border: 4px solid white;
+    border-top: 4px solid black;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -166,21 +155,19 @@ input[type="text"]:focus {
 }
 
 .error {
-    background: #f8d7da;
-    color: #721c24;
+    background: white;
+    color: black;
     padding: 14px;
-    border-radius: 8px;
+    border: 2px solid black;
     margin-top: 16px;
-    border: 1px solid #f5c6cb;
 }
 
 .success {
-    background: #d4edda;
-    color: #155724;
+    background: white;
+    color: black;
     padding: 14px;
-    border-radius: 8px;
+    border: 2px solid black;
     margin-top: 16px;
-    border: 1px solid #c3e6cb;
 }
 
 /* Mobile Responsive */

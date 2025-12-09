@@ -1,6 +1,6 @@
 # YouTube Authorized Video Downloader
 
-A full-stack web application that allows users to download YouTube videos in various qualities. Built with Flask (Python) backend and vanilla JavaScript frontend.
+A full-stack web application that allows users to download YouTube videos in various qualities. Built with Flask (Python) backend using yt-dlp and vanilla JavaScript frontend with minimal black & white UI design.
 
 ## ⚠️ Important Legal Notice
 
@@ -13,23 +13,23 @@ Downloading videos without permission may violate YouTube's Terms of Service and
 
 ## Features
 
-✅ **Modern, Responsive UI** - Clean white card design with mobile support  
+✅ **Minimal Black & White UI** - Simple, clean design with no colors, gradients, or shadows  
 ✅ **Quality Selection** - Fetch and choose from available video resolutions  
 ✅ **Simple Interface** - Paste URL, select quality, download  
-✅ **Flask Backend** - RESTful API with Pytube integration  
+✅ **Flask Backend** - RESTful API with yt-dlp integration  
 ✅ **Free Hosting** - Ready to deploy on Render.com  
 
 ## Tech Stack
 
 ### Frontend
 - HTML5
-- Pure CSS (no frameworks)
+- Pure CSS (minimal black & white design)
 - Vanilla JavaScript (ES6+)
 
 ### Backend
 - Python 3.11+
 - Flask 3.0.0
-- Pytube 15.0.0
+- yt-dlp (YouTube video downloader)
 - Flask-CORS
 - Gunicorn (production server)
 
@@ -38,7 +38,8 @@ Downloading videos without permission may violate YouTube's Terms of Service and
 ```
 youtube-video-downloader/
 ├── app.py                 # Flask backend application
-├── index.html            # Main HTML page
+├── templates/
+│   └── index.html        # Main HTML page
 ├── static/
 │   ├── style.css         # CSS styling
 │   └── script.js         # Frontend JavaScript
@@ -67,11 +68,11 @@ Fetches available video qualities for a YouTube URL.
 ```json
 {
   "title": "Video Title",
-  "qualities": [
+  "formats": [
     {
-      "itag": 18,
+      "format_id": "18",
       "resolution": "360p",
-      "mime_type": "video/mp4",
+      "ext": "mp4",
       "filesize": 12345678,
       "filesize_mb": 11.77
     }
@@ -86,7 +87,7 @@ Downloads a video with the selected quality.
 ```json
 {
   "url": "https://www.youtube.com/watch?v=VIDEO_ID",
-  "itag": 18
+  "format_id": "18"
 }
 ```
 
@@ -173,11 +174,11 @@ Your app will be live at: `https://your-app-name.onrender.com`
 
 ## UI Features
 
+- **Minimal Black & White Design** - No colors, gradients, or shadows
 - **Responsive Design** - Works on desktop, tablet, and mobile
 - **Loading States** - Visual feedback during API calls
 - **Error Handling** - Clear error messages for invalid URLs or failed requests
 - **Success Messages** - Confirmation when operations complete
-- **Smooth Animations** - Hover effects and transitions
 
 ## Security & Best Practices
 
@@ -217,3 +218,7 @@ This project is provided as-is for educational purposes. Users are responsible f
 ## Disclaimer
 
 This tool is for educational purposes and personal use only. The developers are not responsible for any misuse of this application. Always respect copyright laws and YouTube's Terms of Service.
+
+---
+
+**Note:** This application uses yt-dlp to download videos. Make sure you have the necessary permissions before downloading any content.
