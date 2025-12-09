@@ -7,7 +7,7 @@ import subprocess
 import json
 import shutil
 
-app = Flask(__name__, static_folder='static', template_folder='.')
+app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
 
 def sanitize_filename(filename):

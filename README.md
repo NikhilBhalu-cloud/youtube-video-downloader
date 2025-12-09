@@ -38,7 +38,8 @@ Downloading videos without permission may violate YouTube's Terms of Service and
 ```
 youtube-video-downloader/
 ├── app.py                 # Flask backend application
-├── index.html            # Main HTML page
+├── templates/
+│   └── index.html        # Main HTML page
 ├── static/
 │   ├── style.css         # CSS styling
 │   └── script.js         # Frontend JavaScript
