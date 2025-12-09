@@ -3,10 +3,22 @@ from flask_cors import CORS
 from pytube import YouTube
 import os
 import tempfile
+import re
 from pathlib import Path
 
 app = Flask(__name__, static_folder='static', template_folder='.')
 CORS(app)
+
+def sanitize_filename(filename):
+    """Sanitize filename to remove invalid characters"""
+    # Remove path separators and invalid characters
+    filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+    # Remove leading/trailing dots and spaces
+    filename = filename.strip('. ')
+    # Limit length
+    if len(filename) > 200:
+        filename = filename[:200]
+    return filename if filename else 'video'
 
 @app.route('/')
 def index():
@@ -37,7 +49,7 @@ def get_qualities():
                 'resolution': stream.resolution,
                 'mime_type': stream.mime_type,
                 'filesize': stream.filesize,
-                'filesize_mb': round(stream.filesize / (1024 * 1024), 2) if stream.filesize else 'Unknown'
+                'filesize_mb': round(stream.filesize / (1024 * 1024), 2) if stream.filesize else 0
             })
         
         return jsonify({
@@ -51,6 +63,9 @@ def get_qualities():
 @app.route('/api/download', methods=['POST'])
 def download_video():
     """Download a YouTube video with the selected quality"""
+    temp_dir = None
+    output_path = None
+    
     try:
         data = request.get_json()
         url = data.get('url')
@@ -74,14 +89,39 @@ def download_video():
         # Download the video
         output_path = stream.download(output_path=temp_dir)
         
+        # Sanitize the video title for filename
+        safe_title = sanitize_filename(yt.title)
+        
         # Send file to user
-        return send_file(
+        response = send_file(
             output_path,
             as_attachment=True,
-            download_name=f"{yt.title}.mp4"
+            download_name=f"{safe_title}.mp4"
         )
+        
+        # Register cleanup callback to remove temp files after sending
+        @response.call_on_close
+        def cleanup():
+            try:
+                if output_path and os.path.exists(output_path):
+                    os.remove(output_path)
+                if temp_dir and os.path.exists(temp_dir):
+                    os.rmdir(temp_dir)
+            except Exception:
+                pass
+        
+        return response
     
     except Exception as e:
+        # Clean up on error
+        try:
+            if output_path and os.path.exists(output_path):
+                os.remove(output_path)
+            if temp_dir and os.path.exists(temp_dir):
+                os.rmdir(temp_dir)
+        except Exception:
+            pass
+        
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

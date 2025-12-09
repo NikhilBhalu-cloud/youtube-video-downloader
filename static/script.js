@@ -54,7 +54,8 @@ function clearMessages() {
 
 // Validate YouTube URL
 function isValidYouTubeUrl(url) {
-    const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
+    // More restrictive pattern that validates video ID format
+    const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})(&.*)?$/;
     return pattern.test(url);
 }
 
@@ -164,9 +165,11 @@ async function downloadVideo() {
         const contentDisposition = response.headers.get('Content-Disposition');
         let filename = 'video.mp4';
         if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+            const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
             if (filenameMatch) {
-                filename = filenameMatch[1];
+                // Sanitize filename - remove path separators and invalid characters
+                filename = filenameMatch[1].replace(/[<>:"/\\|?*]/g, '').replace(/^\.+/, '');
+                if (!filename) filename = 'video.mp4';
             }
         }
         
