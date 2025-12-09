@@ -56,7 +56,8 @@ function clearMessages() {
 function isValidYouTubeUrl(url) {
     // YouTube video IDs are always 11 characters (alphanumeric, underscore, or hyphen)
     // Pattern validates: protocol, domain, and 11-character video ID
-    const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})(&.*)?$/;
+    // Supports both youtube.com and youtu.be formats with optional query parameters
+    const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})([?&].*)?$/;
     return pattern.test(url);
 }
 
