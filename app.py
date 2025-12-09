@@ -112,7 +112,7 @@ def get_qualities():
             acodec = fmt.get('acodec', 'none')
             
             # Skip formats without video or audio codecs
-            if vcodec == 'none' or acodec == 'none':
+            if not vcodec or vcodec == 'none' or not acodec or acodec == 'none':
                 continue
             
             # Skip if we've already seen this format
@@ -138,7 +138,19 @@ def get_qualities():
             })
         
         # Sort by resolution (descending)
-        processed_formats.sort(key=lambda x: int(x['resolution'].replace('p', '')) if x['resolution'] != 'unknown' else 0, reverse=True)
+        def get_resolution_number(fmt):
+            """Extract numeric resolution value, return 0 if not found"""
+            try:
+                res = fmt['resolution']
+                if res == 'unknown':
+                    return 0
+                # Extract only digits from resolution string (e.g., '720p60' -> 720)
+                match = re.search(r'(\d+)', res)
+                return int(match.group(1)) if match else 0
+            except (ValueError, KeyError, AttributeError):
+                return 0
+        
+        processed_formats.sort(key=get_resolution_number, reverse=True)
         
         if not processed_formats:
             return jsonify({'error': 'No downloadable video formats found for this video'}), 422
@@ -224,10 +236,12 @@ def download_video():
         @response.call_on_close
         def cleanup():
             try:
-                if output_path and os.path.exists(output_path):
-                    os.remove(output_path)
                 if temp_dir and os.path.exists(temp_dir):
-                    shutil.rmtree(temp_dir)
+                    # Use more robust cleanup with error handling
+                    import time
+                    # Give a brief moment for file handle release
+                    time.sleep(0.1)
+                    shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception:
                 pass
         
@@ -255,17 +269,11 @@ def download_video():
 def cleanup_temp_files(output_path, temp_dir):
     """Helper function to clean up temporary files"""
     try:
-        if output_path and os.path.exists(output_path):
-            os.remove(output_path)
-    except (OSError, IOError):
-        # Ignore file removal errors during cleanup
-        pass
-    
-    try:
         if temp_dir and os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+            # Use ignore_errors for more robust cleanup
+            shutil.rmtree(temp_dir, ignore_errors=True)
     except (OSError, IOError):
-        # Ignore directory removal errors during cleanup
+        # Ignore errors during cleanup
         pass
 
 if __name__ == '__main__':
