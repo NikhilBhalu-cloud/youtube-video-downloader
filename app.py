@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 import socket
 import time
+import shutil
 
 app = Flask(__name__, static_folder='static', template_folder='.')
 CORS(app)
@@ -59,12 +60,12 @@ def fetch_youtube_data_with_retry(url, max_retries=3, initial_delay=1):
     
     for attempt in range(max_retries):
         try:
-            # Create YouTube object with timeout
+            # Create YouTube object
             yt = YouTube(url)
             # Force fetch to validate the URL and check accessibility
             _ = yt.title  # This triggers the actual request
             return yt
-        except (socket.timeout, URLError, ConnectionError, socket.gaierror) as e:
+        except (URLError, ConnectionError, OSError) as e:
             last_exception = e
             if attempt < max_retries - 1:
                 time.sleep(delay)
@@ -113,7 +114,7 @@ def get_qualities():
             })
         
         if not qualities:
-            return jsonify({'error': 'No downloadable video qualities found for this video'}), 404
+            return jsonify({'error': 'No downloadable video qualities found for this video'}), 422
         
         return jsonify({
             'title': yt.title,
@@ -144,7 +145,7 @@ def get_qualities():
     except RegexMatchError as e:
         return jsonify({'error': 'Invalid YouTube URL format. Please check the URL and try again.'}), 400
     
-    except (socket.timeout, socket.gaierror) as e:
+    except (socket.gaierror, OSError) as e:
         return jsonify({'error': 'Network timeout. Please check your internet connection and try again.'}), 503
     
     except URLError as e:
@@ -154,7 +155,8 @@ def get_qualities():
         return jsonify({'error': f'Network error: {error_msg}'}), 503
     
     except HTTPError as e:
-        return jsonify({'error': f'HTTP error {e.code}: {e.reason}'}), e.code
+        status_code = e.code if 100 <= e.code < 600 else 500
+        return jsonify({'error': f'HTTP error {e.code}: {e.reason}'}), status_code
     
     except ConnectionError as e:
         return jsonify({'error': 'Connection error. Please check your internet connection and try again.'}), 503
@@ -255,7 +257,7 @@ def download_video():
         cleanup_temp_files(output_path, temp_dir)
         return jsonify({'error': 'Invalid YouTube URL format. Please check the URL and try again.'}), 400
     
-    except (socket.timeout, socket.gaierror) as e:
+    except (socket.gaierror, OSError) as e:
         cleanup_temp_files(output_path, temp_dir)
         return jsonify({'error': 'Network timeout. Please check your internet connection and try again.'}), 503
     
@@ -268,7 +270,8 @@ def download_video():
     
     except HTTPError as e:
         cleanup_temp_files(output_path, temp_dir)
-        return jsonify({'error': f'HTTP error {e.code}: {e.reason}'}), e.code
+        status_code = e.code if 100 <= e.code < 600 else 500
+        return jsonify({'error': f'HTTP error {e.code}: {e.reason}'}), status_code
     
     except ConnectionError as e:
         cleanup_temp_files(output_path, temp_dir)
@@ -290,7 +293,7 @@ def cleanup_temp_files(output_path, temp_dir):
         if output_path and os.path.exists(output_path):
             os.remove(output_path)
         if temp_dir and os.path.exists(temp_dir):
-            os.rmdir(temp_dir)
+            shutil.rmtree(temp_dir)
     except Exception:
         pass
 
