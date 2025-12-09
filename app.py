@@ -38,7 +38,9 @@ def get_qualities():
         # Create YouTube object
         yt = YouTube(url)
         
-        # Get all available streams
+        # Get all available streams (progressive MP4 only for simplicity)
+        # Note: Progressive streams contain both audio and video in one file
+        # For higher quality, consider using adaptive streams (requires merging audio/video)
         streams = yt.streams.filter(progressive=True, file_extension='mp4')
         
         # Format stream data
@@ -49,7 +51,8 @@ def get_qualities():
                 'resolution': stream.resolution,
                 'mime_type': stream.mime_type,
                 'filesize': stream.filesize,
-                'filesize_mb': round(stream.filesize / (1024 * 1024), 2) if stream.filesize else 0
+                # Safe division - handle both None and 0 cases
+                'filesize_mb': round(stream.filesize / (1024 * 1024), 2) if stream.filesize and stream.filesize > 0 else 0
             })
         
         return jsonify({

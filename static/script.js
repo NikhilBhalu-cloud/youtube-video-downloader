@@ -54,7 +54,8 @@ function clearMessages() {
 
 // Validate YouTube URL
 function isValidYouTubeUrl(url) {
-    // More restrictive pattern that validates video ID format
+    // YouTube video IDs are always 11 characters (alphanumeric, underscore, or hyphen)
+    // Pattern validates: protocol, domain, and 11-character video ID
     const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})(&.*)?$/;
     return pattern.test(url);
 }
@@ -167,8 +168,14 @@ async function downloadVideo() {
         if (contentDisposition) {
             const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
             if (filenameMatch) {
-                // Sanitize filename - remove path separators and invalid characters
-                filename = filenameMatch[1].replace(/[<>:"/\\|?*]/g, '').replace(/^\.+/, '');
+                // Comprehensive filename sanitization:
+                // - Remove path separators and invalid filesystem characters
+                // - Remove null bytes and control characters
+                // - Remove leading dots to prevent hidden files
+                filename = filenameMatch[1]
+                    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '')
+                    .replace(/^\.+/, '')
+                    .trim();
                 if (!filename) filename = 'video.mp4';
             }
         }
