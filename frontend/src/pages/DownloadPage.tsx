@@ -24,7 +24,10 @@ type VideoInfo = {
   formats: VideoFormat[];
 };
 
-export default function DownloadPage({ apiBase, onDownloadComplete }: DownloadPageProps) {
+export default function DownloadPage({
+  apiBase,
+  onDownloadComplete,
+}: DownloadPageProps) {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<string>("");
@@ -32,12 +35,17 @@ export default function DownloadPage({ apiBase, onDownloadComplete }: DownloadPa
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const qualityOptions = useMemo(
     () =>
       videoInfo?.formats?.map((f) => ({
-        label: `${f.resolution ?? "Unknown"} (${f.filesize_mb ?? "-"} MB) ${f.ext ? `- ${f.ext}` : ""}`,
+        label: `${f.resolution ?? "Unknown"} (${f.filesize_mb ?? "-"} MB) ${
+          f.ext ? `- ${f.ext}` : ""
+        }`,
         value: f.format_id,
       })) || [],
     [videoInfo]
@@ -59,7 +67,8 @@ export default function DownloadPage({ apiBase, onDownloadComplete }: DownloadPa
       setSelectedQuality(res.data.formats?.[0]?.format_id ?? "");
       setProgressText("");
     } catch (err: any) {
-      const text = err?.response?.data?.error || err.message || "Failed to fetch info";
+      const text =
+        err?.response?.data?.error || err.message || "Failed to fetch info";
       setMessage({ type: "error", text });
       setVideoInfo(null);
     } finally {
@@ -92,13 +101,18 @@ export default function DownloadPage({ apiBase, onDownloadComplete }: DownloadPa
 
       const contentDisposition = response.headers.get("content-disposition");
       const contentLengthHeader = response.headers.get("content-length");
-      const totalBytes = contentLengthHeader ? Number(contentLengthHeader) : undefined;
+      const totalBytes = contentLengthHeader
+        ? Number(contentLengthHeader)
+        : undefined;
 
       let filename = "video.mp4";
       if (contentDisposition) {
         const m = contentDisposition.match(/filename\*?=([^;]+)/);
         if (m && m[1]) {
-          filename = m[1].replace(/UTF-8''/, "").replace(/"/g, "").trim();
+          filename = m[1]
+            .replace(/UTF-8''/, "")
+            .replace(/"/g, "")
+            .trim();
         }
       }
 
@@ -191,13 +205,30 @@ export default function DownloadPage({ apiBase, onDownloadComplete }: DownloadPa
           <div className="video-section">
             <div className="video-details-grid">
               <div className="video-thumbnail-container">
-                <img src={videoInfo.thumbnail} alt={videoInfo.title} className="video-thumbnail" />
+                <img
+                  src={videoInfo.thumbnail}
+                  alt={videoInfo.title}
+                  className="video-thumbnail"
+                />
               </div>
               <div className="video-info-container">
                 <h3 className="video-title">{videoInfo.title}</h3>
                 <div className="download-controls">
-                  <Dropdown value={selectedQuality} options={qualityOptions} onChange={(e) => setSelectedQuality(e.value as string)} placeholder="Choose quality" className="quality-dropdown" disabled={downloading} />
-                  <Button label={downloading ? "Downloading..." : "Download"} icon="pi pi-download" className="download-btn" onClick={downloadVideo} disabled={!selectedQuality || downloading} />
+                  <Dropdown
+                    value={selectedQuality}
+                    options={qualityOptions}
+                    onChange={(e) => setSelectedQuality(e.value as string)}
+                    placeholder="Choose quality"
+                    className="quality-dropdown"
+                    disabled={downloading}
+                  />
+                  <Button
+                    label={downloading ? "Downloading..." : "Download"}
+                    icon="pi pi-download"
+                    className="download-btn"
+                    onClick={downloadVideo}
+                    disabled={!selectedQuality || downloading}
+                  />
                 </div>
               </div>
             </div>
@@ -221,7 +252,13 @@ export default function DownloadPage({ apiBase, onDownloadComplete }: DownloadPa
 
         {message && (
           <div className={`alert alert-${message.type}`}>
-            <i className={`pi ${message.type === "success" ? "pi-check-circle" : "pi-times-circle"}`} />
+            <i
+              className={`pi ${
+                message.type === "success"
+                  ? "pi-check-circle"
+                  : "pi-times-circle"
+              }`}
+            />
             <span>{message.text}</span>
           </div>
         )}
@@ -229,4 +266,3 @@ export default function DownloadPage({ apiBase, onDownloadComplete }: DownloadPa
     </div>
   );
 }
-
