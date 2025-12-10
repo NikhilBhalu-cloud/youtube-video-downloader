@@ -223,17 +223,28 @@ Your app will be live at: `https://your-app-name.onrender.com`
 
 ### Common Issues
 
-1. **"Failed to fetch video qualities"**
-   - Check if the YouTube URL is valid
-   - Ensure the video is publicly accessible
-   - Some videos may have download restrictions
+1. **"Failed to fetch video qualities" / "Failed to fetch video information"**
+   - Check if the YouTube URL is valid and publicly accessible
+   - Some videos may have download restrictions due to YouTube's policies
+   - YouTube may temporarily block requests due to anti-bot measures - try again later
+   - Age-restricted or region-locked videos cannot be downloaded
 
-2. **Server not starting**
+2. **"Sign in to confirm you're not a bot"**
+   - YouTube is detecting automated requests
+   - Try a different video or wait a few minutes before retrying
+   - Some videos require authentication or are region-restricted
+
+3. **"No supported JavaScript runtime"**
+   - This is a temporary yt-dlp configuration issue
+   - The service will automatically retry with fallback methods
+   - Try again in a few moments
+
+4. **Server not starting**
    - Verify Python version (3.11+)
    - Check if all dependencies are installed
    - Ensure port 5000 is not in use
 
-3. **Download fails**
+5. **Download fails**
    - Select a valid quality from the dropdown
    - Check your internet connection
    - Some videos may not be downloadable due to YouTube restrictions

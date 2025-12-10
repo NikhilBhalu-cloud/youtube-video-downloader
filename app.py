@@ -78,12 +78,42 @@ def get_video_info(url):
         Exception: For various error scenarios
     """
     try:
-        # Run yt-dlp with --dump-json to get video information
+        # Enhanced yt-dlp command with better YouTube compatibility for Render
+        cmd = [
+            'python', '-m', 'yt_dlp',
+            '--dump-json',
+            '--no-playlist',
+            '--no-warnings',
+            '--user-agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '--add-header', 'Accept-Language:en-US,en;q=0.9',
+            '--extractor-args', 'youtube:player_skip=js'  # Skip JS player to avoid bot detection
+        ]
+        
+        # Try to find Node.js for JavaScript runtime (important for Render)
+        node_paths = ['node', '/usr/bin/node', '/usr/local/bin/node', '/opt/render/project/node_modules/.bin/node']
+        node_found = False
+        for node_path in node_paths:
+            try:
+                result = subprocess.run([node_path, '--version'], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    cmd.extend(['--js-runtimes', node_path])
+                    node_found = True
+                    print(f"Found Node.js at: {node_path}")
+                    break
+            except:
+                continue
+        
+        if not node_found:
+            print("Node.js not found, using fallback extraction method")
+        
+        cmd.append(url)
+        
+        # Run yt-dlp with enhanced options
         result = subprocess.run(
-            ['python', '-m', 'yt_dlp', '--dump-json', '--no-playlist', url],
+            cmd,
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=60  # Increased timeout for Render
         )
         
         if result.returncode != 0:
@@ -98,6 +128,10 @@ def get_video_info(url):
                 raise Exception('This video is age-restricted and cannot be downloaded.')
             elif 'members-only' in error_msg:
                 raise Exception('This video is only available to channel members.')
+            elif 'Sign in to confirm' in error_msg:
+                raise Exception('YouTube requires authentication for this video. This may be due to regional restrictions or the video being age-restricted. Try a different video or check if the video is publicly accessible.')
+            elif 'No supported JavaScript runtime' in error_msg:
+                raise Exception('Video extraction failed due to YouTube\'s anti-bot measures. This is a temporary issue - please try again later or try a different video.')
             else:
                 raise Exception(f'Failed to fetch video information: {error_msg}')
         
@@ -287,8 +321,26 @@ def download_video():
         ffmpeg_path = tool_exists('ffmpeg')
         has_ffmpeg = ffmpeg_path is not None
         
-        # Build yt-dlp command
-        yt_cmd = ['python', '-m', 'yt_dlp', '-f', format_id, '-o', output_template]
+        # Build yt-dlp command with enhanced options for Render
+        yt_cmd = [
+            'python', '-m', 'yt_dlp',
+            '-f', format_id,
+            '-o', output_template,
+            '--no-warnings',
+            '--user-agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '--add-header', 'Accept-Language:en-US,en;q=0.9'
+        ]
+        
+        # Try to find Node.js for JavaScript runtime
+        node_paths = ['node', '/usr/bin/node', '/usr/local/bin/node']
+        for node_path in node_paths:
+            try:
+                result = subprocess.run([node_path, '--version'], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    yt_cmd.extend(['--js-runtimes', node_path])
+                    break
+            except:
+                continue
         
         # Prepare environment with ffmpeg path if available
         env = os.environ.copy()
