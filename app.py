@@ -78,14 +78,23 @@ def get_video_info(url):
         Exception: For various error scenarios
     """
     try:
-        # Enhanced yt-dlp command with better YouTube compatibility for Render
+        # Enhanced yt-dlp command with comprehensive browser-like headers for Render
         cmd = [
             'python', '-m', 'yt_dlp',
             '--dump-json',
             '--no-playlist',
             '--no-warnings',
-            '--user-agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '--add-header', 'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             '--add-header', 'Accept-Language:en-US,en;q=0.9',
+            '--add-header', 'Accept-Encoding:gzip, deflate, br',
+            '--add-header', 'DNT:1',
+            '--add-header', 'Connection:keep-alive',
+            '--add-header', 'Upgrade-Insecure-Requests:1',
+            '--add-header', 'Sec-Fetch-Dest:document',
+            '--add-header', 'Sec-Fetch-Mode:navigate',
+            '--add-header', 'Sec-Fetch-Site:none',
+            '--add-header', 'Cache-Control:max-age=0',
             '--extractor-args', 'youtube:player_skip=js'  # Skip JS player to avoid bot detection
         ]
         
@@ -321,14 +330,19 @@ def download_video():
         ffmpeg_path = tool_exists('ffmpeg')
         has_ffmpeg = ffmpeg_path is not None
         
-        # Build yt-dlp command with enhanced options for Render
+        # Build yt-dlp command with enhanced headers for Render
         yt_cmd = [
             'python', '-m', 'yt_dlp',
             '-f', format_id,
             '-o', output_template,
             '--no-warnings',
-            '--user-agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            '--add-header', 'Accept-Language:en-US,en;q=0.9'
+            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '--add-header', 'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            '--add-header', 'Accept-Language:en-US,en;q=0.9',
+            '--add-header', 'Accept-Encoding:gzip, deflate, br',
+            '--add-header', 'DNT:1',
+            '--add-header', 'Connection:keep-alive',
+            '--add-header', 'Upgrade-Insecure-Requests:1'
         ]
         
         # Try to find Node.js for JavaScript runtime

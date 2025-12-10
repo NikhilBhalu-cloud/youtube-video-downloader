@@ -5,6 +5,7 @@ A full-stack web application that allows users to download YouTube videos in var
 ## ⚠️ Important Legal Notice
 
 **This tool must only be used to download videos that you:**
+
 - Own the copyright to
 - Have created yourself
 - Have explicit permission to download
@@ -19,11 +20,12 @@ Downloading videos without permission may violate YouTube's Terms of Service and
 ✅ **Streaming Downloads** - Real-time progress tracking  
 ✅ **Responsive Design** - Works on all device sizes  
 ✅ **Flask Backend** - RESTful API with yt-dlp integration  
-✅ **Render Deployment** - Ready to deploy on Render.com  
+✅ **Render Deployment** - Ready to deploy on Render.com
 
 ## Tech Stack
 
 ### Frontend
+
 - React 19 with TypeScript
 - Vite build system
 - PrimeReact UI components
@@ -31,6 +33,7 @@ Downloading videos without permission may violate YouTube's Terms of Service and
 - Responsive CSS design
 
 ### Backend
+
 - Python 3.11+
 - Flask 3.0.0
 - yt-dlp (YouTube video downloader)
@@ -59,12 +62,15 @@ youtube-video-downloader/
 ## API Endpoints
 
 ### 1. GET `/`
+
 Serves the main HTML page.
 
 ### 2. POST `/api/qualities`
+
 Fetches available video qualities for a YouTube URL.
 
 **Request Body:**
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=VIDEO_ID"
@@ -72,6 +78,7 @@ Fetches available video qualities for a YouTube URL.
 ```
 
 **Response:**
+
 ```json
 {
   "title": "Video Title",
@@ -88,9 +95,11 @@ Fetches available video qualities for a YouTube URL.
 ```
 
 ### 3. POST `/api/download`
+
 Downloads a video with the selected quality.
 
 **Request Body:**
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=VIDEO_ID",
@@ -104,18 +113,21 @@ Returns the video file as a download.
 ## Local Development
 
 ### Prerequisites
+
 - Python 3.11 or higher
 - pip (Python package manager)
 
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/NikhilBhalu-cloud/youtube-video-downloader.git
 cd youtube-video-downloader
 ```
 
 2. Create a virtual environment (recommended):
+
 ```bash
 python -m venv venv
 
@@ -127,16 +139,19 @@ source venv/bin/activate
 ```
 
 3. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 4. Run the application:
+
 ```bash
 python app.py
 ```
 
 5. Open your browser and navigate to:
+
 ```
 http://localhost:5000
 ```
@@ -160,6 +175,7 @@ http://localhost:5000
 If you prefer to deploy manually:
 
 1. **Deploy Backend First:**
+
    - Create a new Web Service on Render
    - Connect your GitHub repo
    - Set build command: `pip install -r requirements.txt`
@@ -172,8 +188,8 @@ If you prefer to deploy manually:
    - Set start command: `cd frontend && npx serve -s dist -l 3000`
    - Add environment variable: `VITE_API_BASE_URL=https://your-api.onrender.com/api`
    - Configure rewrite rules for SPA routing
-4. Connect your GitHub repository
-5. Render will automatically detect `render.yaml` and deploy
+3. Connect your GitHub repository
+4. Render will automatically detect `render.yaml` and deploy
 
 ### Method 2: Manual Setup
 
@@ -192,10 +208,12 @@ Your app will be live at: `https://your-app-name.onrender.com`
 ## Usage Guide
 
 1. **Enter YouTube URL**
+
    - Paste a YouTube video URL into the input field
    - Click "Get Video Qualities" or press Enter
 
 2. **Select Quality**
+
    - Choose your preferred resolution from the dropdown
    - File size is shown for each option
 
@@ -224,22 +242,26 @@ Your app will be live at: `https://your-app-name.onrender.com`
 ### Common Issues
 
 1. **"Failed to fetch video qualities" / "Failed to fetch video information"**
+
    - Check if the YouTube URL is valid and publicly accessible
    - Some videos may have download restrictions due to YouTube's policies
    - YouTube may temporarily block requests due to anti-bot measures - try again later
    - Age-restricted or region-locked videos cannot be downloaded
 
 2. **"Sign in to confirm you're not a bot"**
+
    - YouTube is detecting automated requests
    - Try a different video or wait a few minutes before retrying
    - Some videos require authentication or are region-restricted
 
 3. **"No supported JavaScript runtime"**
+
    - This is a temporary yt-dlp configuration issue
    - The service will automatically retry with fallback methods
    - Try again in a few moments
 
 4. **Server not starting**
+
    - Verify Python version (3.11+)
    - Check if all dependencies are installed
    - Ensure port 5000 is not in use
