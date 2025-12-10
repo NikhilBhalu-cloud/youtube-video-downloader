@@ -3,72 +3,167 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YouTube Authorized Video Downloader</title>
+    <title>VideoFetch - Download YouTube Videos</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
     <div class="container">
-      <div class="card">
-        <h1>YouTube Authorized Video Downloader</h1>
-        <p class="warning">
-          ⚠️ Only download videos you own, created, or have permission to
-          download
+      <!-- Hero Header -->
+      <header class="hero">
+        <div class="hero-content">
+          <div class="logo-section">
+            <i class="fas fa-video"></i>
+            <h1>VideoFetch</h1>
+          </div>
+          <p class="tagline">Download YouTube videos in any quality</p>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="content">
+        <!-- Download Section -->
+        <div class="card download-card">
+          <div class="card-title">
+            <i class="fas fa-download"></i>
+            <h2>Download Video</h2>
+          </div>
+
+          <!-- Step 1: URL Input -->
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <label for="videoUrl">Paste YouTube URL</label>
+              <div class="input-group">
+                <input
+                  type="text"
+                  id="videoUrl"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  class="input-field"
+                />
+                <button class="btn btn-primary" id="getQualitiesBtn">
+                  <i class="fas fa-search"></i> Get Info
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Info Display -->
+          <div id="videoInfo" class="video-info hidden">
+            <div class="video-card">
+              <img
+                id="videoThumbnail"
+                src=""
+                alt="Video thumbnail"
+                class="thumbnail"
+              />
+              <div class="video-details">
+                <h3 id="videoTitle">Video Title</h3>
+                <div class="quality-selector">
+                  <label for="qualitySelect">Select Quality:</label>
+                  <select id="qualitySelect" class="input-field">
+                    <option value="">Loading...</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="emptyState" class="empty-state">
+            <i class="fas fa-film"></i>
+            <p>Enter a YouTube URL to get started</p>
+          </div>
+
+          <!-- Step 2: Download Button -->
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <button class="btn btn-success" id="downloadBtn" disabled>
+                <i class="fas fa-arrow-down"></i> Download
+              </button>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div id="downloadProgress" class="progress-container hidden">
+            <div class="progress-info">
+              <span id="progressText">Preparing download...</span>
+              <span id="progressPercentage">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div id="progressBar" class="progress-fill"></div>
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div id="error" class="message error-message hidden">
+            <i class="fas fa-exclamation-circle"></i>
+            <span id="errorText"></span>
+          </div>
+
+          <div id="success" class="message success-message hidden">
+            <i class="fas fa-check-circle"></i>
+            <span id="successText"></span>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="stats-grid">
+          <div class="stat-box">
+            <i class="fas fa-cloud-download-alt"></i>
+            <div>
+              <div class="stat-number" id="downloadCount">0</div>
+              <div class="stat-label">Videos Downloaded</div>
+            </div>
+          </div>
+          <div class="stat-box">
+            <i class="fas fa-star"></i>
+            <div>
+              <div class="stat-number" id="savedCount">0</div>
+              <div class="stat-label">Saved Videos</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Features Grid -->
+        <div class="features-section">
+          <h2>More Features</h2>
+          <div class="features-grid">
+            <div class="feature-box">
+              <i class="fas fa-history"></i>
+              <h3>Download History</h3>
+              <p>Keep track of all your downloads</p>
+            </div>
+            <div class="feature-box">
+              <i class="fas fa-list"></i>
+              <h3>Batch Download</h3>
+              <p>Download multiple videos at once</p>
+            </div>
+            <div class="feature-box">
+              <i class="fas fa-layer-group"></i>
+              <h3>Playlist Download</h3>
+              <p>Download entire playlists easily</p>
+            </div>
+            <div class="feature-box">
+              <i class="fas fa-cog"></i>
+              <h3>Settings</h3>
+              <p>Customize your download preferences</p>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <p>&copy; 2025 VideoFetch - Safe, Fast, and No Registration Required</p>
+        <p class="disclaimer">
+          Only download videos you own or have permission to download
         </p>
-
-        <div class="input-group">
-          <input
-            type="text"
-            id="videoUrl"
-            placeholder="Paste YouTube URL here..."
-            autocomplete="off"
-          />
-        </div>
-
-        <button id="getQualitiesBtn" class="btn btn-primary">
-          Get Video Qualities
-        </button>
-
-        <div id="videoInfo" class="video-info" style="display: none">
-          <div class="thumbnail-container">
-            <img
-              id="videoThumbnail"
-              src=""
-              alt="Video thumbnail"
-              class="video-thumbnail"
-            />
-          </div>
-          <h3 id="videoTitle"></h3>
-
-          <div class="select-group">
-            <label for="qualitySelect">Select Quality:</label>
-            <select id="qualitySelect" class="quality-select">
-              <option value="">Choose a quality...</option>
-            </select>
-          </div>
-
-          <button id="downloadBtn" class="btn btn-success">Download</button>
-        </div>
-
-        <div id="loading" class="loading" style="display: none">
-          <div class="spinner"></div>
-          <p>Loading...</p>
-        </div>
-
-        <div
-          id="downloadProgress"
-          class="download-progress"
-          style="display: none"
-        >
-          <p id="progressText">Starting download...</p>
-          <div class="progress-bar-container">
-            <div class="progress-bar" id="progressBar"></div>
-          </div>
-          <p id="progressPercentage">0%</p>
-        </div>
-
-        <div id="error" class="error" style="display: none"></div>
-        <div id="success" class="success" style="display: none"></div>
-      </div>
+      </footer>
     </div>
 
     <script src="/static/script.js"></script>

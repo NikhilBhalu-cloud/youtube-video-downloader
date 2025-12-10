@@ -2,11 +2,11 @@
 const videoUrlInput = document.getElementById("videoUrl");
 const getQualitiesBtn = document.getElementById("getQualitiesBtn");
 const videoInfoDiv = document.getElementById("videoInfo");
+const emptyState = document.getElementById("emptyState");
 const videoTitleEl = document.getElementById("videoTitle");
 const videoThumbnail = document.getElementById("videoThumbnail");
 const qualitySelect = document.getElementById("qualitySelect");
 const downloadBtn = document.getElementById("downloadBtn");
-const loadingDiv = document.getElementById("loading");
 const downloadProgressDiv = document.getElementById("downloadProgress");
 const progressBar = document.getElementById("progressBar");
 const progressText = document.getElementById("progressText");
@@ -31,110 +31,37 @@ function hideElement(element) {
   element.style.display = "none";
 }
 
-function showLoading() {
-  showElement(loadingDiv);
-  hideElement(errorDiv);
-  hideElement(successDiv);
-  hideElement(downloadProgressDiv);
+// Initialize on page load
+document.addEventListener("DOMContentLoaded", () => {
+  updateStats();
+});
+
+// Update stats display
+function updateStats() {
+  const downloadCount = localStorage.getItem("downloadCount") || "0";
+  const savedCount = localStorage.getItem("savedCount") || "0";
+
+  const downloadCountEl = document.getElementById("downloadCount");
+  const savedCountEl = document.getElementById("savedCount");
+
+  if (downloadCountEl) downloadCountEl.textContent = downloadCount;
+  if (savedCountEl) savedCountEl.textContent = savedCount;
 }
 
-function hideLoading() {
-  hideElement(loadingDiv);
-}
-
-function showDownloadProgress() {
-  showElement(downloadProgressDiv);
-  hideElement(errorDiv);
-  hideElement(successDiv);
-  hideElement(loadingDiv);
-}
-
-function startIndeterminateProgress() {
-  // Gentle ramp up to 30% while waiting for server to start streaming
-  let pct = 3;
-  updateProgress(pct, "Preparing download...");
-  if (progressInterval) clearInterval(progressInterval);
-  progressInterval = setInterval(() => {
-    pct = Math.min(30, pct + 2);
-    updateProgress(pct, "Preparing download...");
-    if (pct >= 30) {
-      clearInterval(progressInterval);
-      progressInterval = null;
-    }
-  }, 400);
-}
-
-function stopIndeterminateProgress() {
-  if (progressInterval) {
-    clearInterval(progressInterval);
-    progressInterval = null;
-  }
-}
-
-function updateProgress(percent, text = null) {
-  progressBar.style.width = percent + "%";
-  progressPercentage.textContent = Math.round(percent) + "%";
-  if (text) {
-    progressText.textContent = text;
-  }
-}
-
-function resetProgress() {
-  updateProgress(0, "Starting download...");
-  hideElement(downloadProgressDiv);
-}
-
-function showError(message) {
-  errorDiv.textContent = message;
-  showElement(errorDiv);
-  hideElement(successDiv);
-  hideElement(downloadProgressDiv);
-}
-
-function showSuccess(message) {
-  successDiv.textContent = message;
-  showElement(successDiv);
-  hideElement(errorDiv);
-}
-
-function clearMessages() {
-  hideElement(errorDiv);
-  hideElement(successDiv);
-}
-
-// Validate YouTube URL
-function isValidYouTubeUrl(url) {
-  // YouTube video IDs are always 11 characters (alphanumeric, underscore, or hyphen)
-  // Pattern handles youtube.com and youtu.be formats separately:
-  // - youtube.com: already has ? before video ID, additional params use &
-  // - youtu.be: no ? before video ID, query params start with ?
-  const pattern =
-    /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=[\w-]{11}(&.*)?|youtu\.be\/[\w-]{11}(\?.*)?)$/;
-  return pattern.test(url);
-}
-
-// Fetch video qualities
+// Get video qualities
 async function getVideoQualities() {
   const url = videoUrlInput.value.trim();
 
-  // Validate URL
   if (!url) {
     showError("Please enter a YouTube URL");
     return;
   }
 
-  if (!isValidYouTubeUrl(url)) {
-    showError("Please enter a valid YouTube URL");
-    return;
-  }
-
-  // Clear previous data
   clearMessages();
-  hideElement(videoInfoDiv);
-  qualitySelect.innerHTML = '<option value="">Choose a quality...</option>';
-
-  // Show loading
-  showLoading();
+  showElement(downloadProgressDiv);
+  progressBar.style.width = "0%";
+  progressPercentage.textContent = "0%";
+  progressText.textContent = "Fetching video info...";
   getQualitiesBtn.disabled = true;
 
   try {
@@ -149,54 +76,51 @@ async function getVideoQualities() {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch video qualities");
+      throw new Error(data.error || "Failed to fetch video info");
     }
 
-    // Store data
     currentVideoUrl = url;
-    currentFormats = data.formats;
+    currentFormats = data.formats || [];
 
-    // Display video title
-    videoTitleEl.textContent = data.title;
+    videoTitleEl.textContent = data.title || "Unknown Title";
+    videoThumbnail.src = data.thumbnail || "";
+    videoThumbnail.style.display = "block";
 
-    // Display thumbnail if available
-    if (data.thumbnail) {
-      videoThumbnail.src = data.thumbnail;
-      videoThumbnail.style.display = "block";
-    } else {
-      videoThumbnail.style.display = "none";
-    }
-
-    // Populate quality dropdown with better formatting
-    if (data.formats && data.formats.length > 0) {
-      data.formats.forEach((format) => {
+    // Populate quality options
+    qualitySelect.innerHTML = "";
+    if (currentFormats.length > 0) {
+      currentFormats.forEach((format) => {
         const option = document.createElement("option");
         option.value = format.format_id;
-        const sizeText =
-          format.filesize_mb > 0 ? ` (${format.filesize_mb} MB)` : "";
-        option.textContent = `${
-          format.resolution
-        } - ${format.ext.toUpperCase()}${sizeText}`;
+        option.textContent = format.quality;
         qualitySelect.appendChild(option);
       });
-
-      showElement(videoInfoDiv);
-      showSuccess("Video loaded successfully! Select a quality to download.");
+      downloadBtn.disabled = false;
     } else {
-      showError("No downloadable formats found for this video");
+      throw new Error("No formats found");
     }
+
+    hideElement(emptyState);
+    showElement(videoInfoDiv);
+    hideElement(downloadProgressDiv);
+    showSuccess("Video info loaded successfully");
   } catch (error) {
-    showError(error.message);
+    hideElement(downloadProgressDiv);
+    showError(error.message || "Error fetching video info");
+    downloadBtn.disabled = true;
   } finally {
-    hideLoading();
     getQualitiesBtn.disabled = false;
   }
 }
 
 // Download video
 async function downloadVideo() {
-  const selectedFormatId = qualitySelect.value;
+  if (!currentVideoUrl) {
+    showError("Please fetch a video first");
+    return;
+  }
 
+  const selectedFormatId = qualitySelect.value;
   if (!selectedFormatId) {
     showError("Please select a quality");
     return;
@@ -204,12 +128,19 @@ async function downloadVideo() {
 
   clearMessages();
   showDownloadProgress();
-  startIndeterminateProgress();
   downloadBtn.disabled = true;
   getQualitiesBtn.disabled = true;
 
+  // Start smooth progress animation
+  let currentProgress = 0;
+  const smoothInterval = setInterval(() => {
+    if (currentProgress < 90) {
+      currentProgress += 0.5;
+      updateProgress(currentProgress, "Downloading and processing video...");
+    }
+  }, 100);
+
   try {
-    // Start the download request
     const response = await fetch(`${API_BASE}/api/download`, {
       method: "POST",
       headers: {
@@ -221,67 +152,25 @@ async function downloadVideo() {
       }),
     });
 
-    // Response received — switch to determinate mode
-    stopIndeterminateProgress();
-    updateProgress(5, "Connecting...");
+    clearInterval(smoothInterval);
 
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || "Failed to download video");
+      const error = await response.json();
+      throw new Error(error.error || "Download failed");
     }
 
-    // Get total file size from headers if available
-    const contentLength = response.headers.get("content-length");
-    const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
-
-    // Read the response as a stream to track progress
-    const reader = response.body.getReader();
-    const chunks = [];
-    let downloadedSize = 0;
-
-    updateProgress(10, "Downloading...");
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      chunks.push(value);
-      downloadedSize += value.length;
-
-      // Update progress bar based on downloaded size
-      if (totalSize > 0) {
-        const percent = (downloadedSize / totalSize) * 100;
-        updateProgress(
-          Math.min(percent, 95),
-          `Downloading: ${(downloadedSize / (1024 * 1024)).toFixed(2)} MB`
-        );
-      } else {
-        updateProgress(10 + (downloadedSize % 50), "Downloading...");
-      }
-    }
-
-    // Combine chunks into a single blob
-    const blob = new Blob(chunks);
-    updateProgress(95, "Processing...");
-
-    // Get filename from Content-Disposition header or use default
-    const contentDisposition = response.headers.get("Content-Disposition");
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get("content-disposition");
     let filename = "video.mp4";
+
     if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-      if (filenameMatch) {
-        filename = filenameMatch[1]
-          .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
-          .replace(/^\.+/, "")
-          .trim();
-        if (!filename) filename = "video.mp4";
-      }
+      const filenameMatch = contentDisposition.match(/filename="(.+?)"/);
+      if (filenameMatch) filename = filenameMatch[1];
     }
 
     // Create download link
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.style.display = "none";
     a.href = url;
     a.download = filename;
 
@@ -295,17 +184,65 @@ async function downloadVideo() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       resetProgress();
-      showSuccess(`✓ Download started: ${filename}`);
-    }, 500);
+      showSuccess(`✓ Video downloaded successfully: ${filename}`);
+
+      // Increment download count
+      let downloadCount =
+        parseInt(localStorage.getItem("downloadCount") || "0") + 1;
+      localStorage.setItem("downloadCount", downloadCount);
+      updateStats();
+    }, 1000);
   } catch (error) {
-    stopIndeterminateProgress();
+    clearInterval(smoothInterval);
     resetProgress();
     showError(error.message || "Download failed. Please try again.");
   } finally {
-    stopIndeterminateProgress();
     downloadBtn.disabled = false;
     getQualitiesBtn.disabled = false;
   }
+}
+
+// Update progress bar
+function updateProgress(percentage, text) {
+  progressBar.style.width = percentage + "%";
+  progressPercentage.textContent = Math.round(percentage) + "%";
+  if (text) progressText.textContent = text;
+}
+
+// Show download progress
+function showDownloadProgress() {
+  showElement(downloadProgressDiv);
+  hideElement(videoInfoDiv);
+}
+
+// Reset progress bar
+function resetProgress() {
+  progressBar.style.width = "0%";
+  progressPercentage.textContent = "0%";
+  progressText.textContent = "Preparing download...";
+  setTimeout(() => {
+    hideElement(downloadProgressDiv);
+  }, 500);
+}
+
+// Show error message
+function showError(message) {
+  const errorText = document.getElementById("errorText");
+  errorText.textContent = message;
+  showElement(errorDiv);
+}
+
+// Show success message
+function showSuccess(message) {
+  const successText = document.getElementById("successText");
+  successText.textContent = message;
+  showElement(successDiv);
+}
+
+// Clear all messages
+function clearMessages() {
+  hideElement(errorDiv);
+  hideElement(successDiv);
 }
 
 // Event listeners

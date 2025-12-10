@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import tempfile
@@ -10,20 +10,48 @@ import shutil
 # Simple cache for tool checks
 _tool_cache = {}
 
+# Known ffmpeg path for Windows WinGet installation
+FFMPEG_WINGET_PATH = r"C:\Users\BAPS\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe"
+
 
 def tool_exists(cmd):
     """Return True if command exists on PATH (cached)."""
     if cmd in _tool_cache:
         return _tool_cache[cmd]
+    
+    # Special handling for ffmpeg on Windows
+    if cmd == 'ffmpeg' and os.name == 'nt':
+        # Try known WinGet installation path first
+        if os.path.exists(FFMPEG_WINGET_PATH):
+            try:
+                subprocess.run([FFMPEG_WINGET_PATH, '--version'], capture_output=True, text=True, timeout=5)
+                _tool_cache[cmd] = FFMPEG_WINGET_PATH
+                return FFMPEG_WINGET_PATH
+            except Exception:
+                pass
+    
     try:
+        # Try direct command
         subprocess.run([cmd, '--version'], capture_output=True, text=True, timeout=5)
-        _tool_cache[cmd] = True
+        _tool_cache[cmd] = cmd
+        return cmd
     except Exception:
-        _tool_cache[cmd] = False
-    return _tool_cache[cmd]
+        pass
+    
+    # Try with .exe extension on Windows
+    if os.name == 'nt':
+        try:
+            subprocess.run([f'{cmd}.exe', '--version'], capture_output=True, text=True, timeout=5)
+            _tool_cache[cmd] = f'{cmd}.exe'
+            return f'{cmd}.exe'
+        except Exception:
+            pass
+    
+    _tool_cache[cmd] = None
+    return None
 
-app = Flask(__name__, static_folder='static', template_folder='templates')
-CORS(app)
+app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 def sanitize_filename(filename):
     """Sanitize filename to remove invalid characters"""
@@ -35,11 +63,6 @@ def sanitize_filename(filename):
     if len(filename) > 200:
         filename = filename[:200]
     return filename if filename else 'video'
-
-@app.route('/')
-def index():
-    """Serve the main HTML page"""
-    return render_template('index.html')
 
 def get_video_info(url):
     """
@@ -261,55 +284,97 @@ def download_video():
         output_template = os.path.join(temp_dir, '%(title)s.%(ext)s')
 
         requires_merge = '+' in format_id
-        if requires_merge and not tool_exists('ffmpeg'):
-            raise Exception('High-quality formats need ffmpeg to merge audio and video. Install ffmpeg and try again, or choose a lower resolution (e.g., 360p).')
-
-        yt_cmd = ['python', '-m', 'yt_dlp', '-f', format_id, '-o', output_template, url]
+        ffmpeg_path = tool_exists('ffmpeg')
+        has_ffmpeg = ffmpeg_path is not None
+        
+        # Build yt-dlp command
+        yt_cmd = ['python', '-m', 'yt_dlp', '-f', format_id, '-o', output_template]
+        
+        # Prepare environment with ffmpeg path if available
+        env = os.environ.copy()
+        if has_ffmpeg and os.name == 'nt':
+            # Add ffmpeg bin directory to PATH for Windows
+            ffmpeg_bin_dir = os.path.dirname(ffmpeg_path)
+            if ffmpeg_bin_dir:
+                env['PATH'] = ffmpeg_bin_dir + ';' + env.get('PATH', '')
+        
         if requires_merge:
-            yt_cmd.extend(['--merge-output-format', 'mp4'])
+            if has_ffmpeg:
+                # Ensure audio and video are merged into mp4 with ffmpeg
+                yt_cmd.extend([
+                    '--merge-output-format', 'mp4',
+                    '--postprocessor-args', 'ffmpeg:-c copy',
+                    '--no-keep-video'  # Don't keep separate video/audio files
+                ])
+            else:
+                # Use yt-dlp's built-in merger without explicit ffmpeg
+                yt_cmd.extend([
+                    '--merge-output-format', 'mkv',  # Use mkv as fallback if no ffmpeg
+                ])
+        
+        yt_cmd.append(url)
+        
+        print(f"Executing command: {' '.join(yt_cmd)}")  # Debug logging
+        print(f"FFmpeg available: {has_ffmpeg}, path: {ffmpeg_path}")  # Debug logging
         
         result = subprocess.run(
             yt_cmd,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minutes timeout for download
+            timeout=300,  # 5 minutes timeout for download
+            env=env  # Pass environment with ffmpeg PATH
         )
+        
+        print(f"yt-dlp stdout: {result.stdout}")  # Debug logging
+        print(f"yt-dlp stderr: {result.stderr}")  # Debug logging
         
         if result.returncode != 0:
             error_msg = result.stderr.strip()
+            print(f"yt-dlp error (return code {result.returncode}): {error_msg}")
             raise Exception(f'Download failed: {error_msg}')
         
         # Find the downloaded file
         files = os.listdir(temp_dir)
+        print(f"Files in temp dir: {files}")  # Debug logging
         if not files:
             raise Exception('Download completed but file not found')
         
         output_path = os.path.join(temp_dir, files[0])
+        print(f"Downloaded file: {output_path}")  # Debug logging
         
         # Get file extension
         _, ext = os.path.splitext(output_path)
         if not ext:
             ext = '.mp4'
         
-        # Send file to user
-        response = send_file(
-            output_path,
-            as_attachment=True,
-            download_name=f"{safe_title}{ext}"
-        )
+        # Get file size for Content-Length header
+        file_size = os.path.getsize(output_path)
         
-        # Register cleanup callback to remove temp files after sending
-        @response.call_on_close
-        def cleanup():
+        # Create streaming response with proper headers for progress tracking
+        def generate():
+            chunk_size = 64 * 1024  # 64KB chunks for smoother progress updates
+            with open(output_path, 'rb') as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+            # Cleanup after streaming
             try:
                 if temp_dir and os.path.exists(temp_dir):
-                    # Use more robust cleanup with error handling
                     import time
-                    # Give a brief moment for file handle release
                     time.sleep(0.1)
                     shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception:
                 pass
+        
+        from flask import Response
+        response = Response(generate(), mimetype='application/octet-stream', direct_passthrough=False)
+        response.headers['Content-Disposition'] = f'attachment; filename="{safe_title}{ext}"'
+        response.headers['Content-Length'] = str(file_size)
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Cache-Control'] = 'no-cache'
+        response.headers['X-Accel-Buffering'] = 'no'
         
         return response
     
