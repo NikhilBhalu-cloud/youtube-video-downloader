@@ -4,7 +4,7 @@ import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import DownloadPage from "./pages/DownloadPage";
 
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);

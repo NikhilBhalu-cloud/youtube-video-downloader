@@ -1,6 +1,6 @@
-# YouTube Authorized Video Downloader
+# YouTube Video Downloader
 
-A full-stack web application that allows users to download YouTube videos in various qualities. Built with Flask (Python) backend using yt-dlp and vanilla JavaScript frontend with minimal black & white UI design.
+A full-stack web application that allows users to download YouTube videos in various qualities. Built with React frontend and Flask (Python) backend using yt-dlp.
 
 ## ⚠️ Important Legal Notice
 
@@ -13,18 +13,22 @@ Downloading videos without permission may violate YouTube's Terms of Service and
 
 ## Features
 
-✅ **Minimal Black & White UI** - Simple, clean design with no colors, gradients, or shadows  
+✅ **Modern React UI** - Built with React, TypeScript, and PrimeReact components  
+✅ **Minimal Black & White Design** - Clean, professional interface  
 ✅ **Quality Selection** - Fetch and choose from available video resolutions  
-✅ **Simple Interface** - Paste URL, select quality, download  
+✅ **Streaming Downloads** - Real-time progress tracking  
+✅ **Responsive Design** - Works on all device sizes  
 ✅ **Flask Backend** - RESTful API with yt-dlp integration  
-✅ **Free Hosting** - Ready to deploy on Render.com  
+✅ **Render Deployment** - Ready to deploy on Render.com  
 
 ## Tech Stack
 
 ### Frontend
-- HTML5
-- Pure CSS (minimal black & white design)
-- Vanilla JavaScript (ES6+)
+- React 19 with TypeScript
+- Vite build system
+- PrimeReact UI components
+- Axios for API calls
+- Responsive CSS design
 
 ### Backend
 - Python 3.11+
@@ -37,14 +41,17 @@ Downloading videos without permission may violate YouTube's Terms of Service and
 
 ```
 youtube-video-downloader/
-├── app.py                 # Flask backend application
-├── templates/
-│   └── index.html        # Main HTML page
-├── static/
-│   ├── style.css         # CSS styling
-│   └── script.js         # Frontend JavaScript
+├── frontend/             # React frontend application
+│   ├── src/
+│   │   ├── components/   # React components
+│   │   ├── pages/        # Page components
+│   │   └── App.tsx       # Main app component
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── server.js         # Development server
+├── app.py                # Flask backend application
 ├── requirements.txt      # Python dependencies
-├── Procfile             # Heroku/Render start command
+├── Procfile             # Render start command
 ├── render.yaml          # Render.com configuration
 └── README.md            # This file
 ```
@@ -136,11 +143,35 @@ http://localhost:5000
 
 ## Deployment to Render.com
 
-### Method 1: Using render.yaml (Recommended)
+### Using render.yaml (Recommended)
 
 1. Push your code to GitHub
 2. Sign up/login to [Render.com](https://render.com)
 3. Click "New +" → "Blueprint"
+4. Connect your GitHub repository
+5. Render will automatically detect the `render.yaml` file and create two services:
+   - **Backend API**: Python service running the Flask app
+   - **Frontend**: Node.js service running the React app
+6. The services will be automatically configured to communicate with each other
+7. Your app will be available at the frontend service URL
+
+### Manual Deployment (Alternative)
+
+If you prefer to deploy manually:
+
+1. **Deploy Backend First:**
+   - Create a new Web Service on Render
+   - Connect your GitHub repo
+   - Set build command: `pip install -r requirements.txt`
+   - Set start command: `gunicorn app:app`
+   - Note the service URL (e.g., `https://your-api.onrender.com`)
+
+2. **Deploy Frontend:**
+   - Create another Web Service on Render
+   - Set build command: `cd frontend && npm install && npm run build`
+   - Set start command: `cd frontend && npx serve -s dist -l 3000`
+   - Add environment variable: `VITE_API_BASE_URL=https://your-api.onrender.com/api`
+   - Configure rewrite rules for SPA routing
 4. Connect your GitHub repository
 5. Render will automatically detect `render.yaml` and deploy
 

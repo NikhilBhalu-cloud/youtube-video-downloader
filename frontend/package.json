@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node server",
-    "build": "npm run build:client && npm run build:server",
+    "build": "vite build",
     "build:client": "vite build --outDir dist/client",
     "build:server": "vite build --ssr src/entry-server.tsx --outDir dist/server",
     "preview": "cross-env NODE_ENV=production node server"
@@ -19,6 +19,7 @@
     "primereact": "^10.3.2",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "serve": "^14.2.1",
     "sirv": "^3.0.2"
   },
   "devDependencies": {

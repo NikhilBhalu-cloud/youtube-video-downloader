@@ -1,9 +1,30 @@
 services:
+  # Backend API service
   - type: web
-    name: youtube-video-downloader
+    name: youtube-video-downloader-api
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+    healthCheckPath: /api/qualities
+
+  # Frontend React service
+  - type: web
+    name: youtube-video-downloader-frontend
+    env: node
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npx serve -s dist -l 3000
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: youtube-video-downloader-api
+          property: host
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
